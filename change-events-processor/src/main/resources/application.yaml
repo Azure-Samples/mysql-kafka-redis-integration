@@ -1,0 +1,35 @@
+redis:
+  host: kehsihba.southeastasia.redisenterprise.cache.azure.net
+  port: 10000
+  password: fYv7Ym4wolvviYmYG3vv3roij1CvRi+7cQrk4TFPpkw=
+topic:
+  name: myserver.products
+  partitions-num: 6
+  replication-factor: 3
+server:
+  port: 9080
+spring:
+  kafka:
+    bootstrap-servers:
+      - pkc-epwny.eastus.azure.confluent.cloud:9092
+    properties:
+      ssl.endpoint.identification.algorithm: https
+      sasl.mechanism: PLAIN
+      request.timeout.ms: 20000
+      retry.backoff.ms: 500
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="DB23LJH36767ODLJ" password="/mMemyQPQO4Dy9AlGfamJexOxyKDZH2amlPEcuz+hgmC81OzRwRWObBRoNiFCvhH";
+      security.protocol: SASL_SSL
+
+    consumer:
+      group-id: change-events-processor-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-interval-ms: 10000
+      properties:
+        spring.json.use.type.headers: false
+    template:
+      default-topic:
+logging:
+  level:
+    root: info
