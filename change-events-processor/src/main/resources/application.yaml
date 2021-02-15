@@ -1,9 +1,9 @@
 redis:
-  host: kehsihba.southeastasia.redisenterprise.cache.azure.net
-  port: 10000
-  password: fYv7Ym4wolvviYmYG3vv3roij1CvRi+7cQrk4TFPpkw=
+  host: <enter redis host>
+  port: <enter redis host>
+  password: <enter redis access key>
 topic:
-  name: myserver.products
+  name: <topic name e.g. myserver.products>
   partitions-num: 6
   replication-factor: 3
 server:
@@ -11,13 +11,13 @@ server:
 spring:
   kafka:
     bootstrap-servers:
-      - pkc-epwny.eastus.azure.confluent.cloud:9092
+      - <kafka bootstrap server>
     properties:
       ssl.endpoint.identification.algorithm: https
       sasl.mechanism: PLAIN
       request.timeout.ms: 20000
       retry.backoff.ms: 500
-      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="DB23LJH36767ODLJ" password="/mMemyQPQO4Dy9AlGfamJexOxyKDZH2amlPEcuz+hgmC81OzRwRWObBRoNiFCvhH";
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="<kafka API key>" password="<kafka API secret>";
       security.protocol: SASL_SSL
 
     consumer:

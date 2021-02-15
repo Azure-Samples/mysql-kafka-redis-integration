@@ -1,4 +1,4 @@
 redis:
-  host: kehsihba.southeastasia.redisenterprise.cache.azure.net
-  port: 10000
-  password: fYv7Ym4wolvviYmYG3vv3roij1CvRi+7cQrk4TFPpkw=
+  host: <enter redis host>
+  port: <enter redis port>
+  password: <enter redis access key>
