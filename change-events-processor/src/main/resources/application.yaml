@@ -1,6 +1,6 @@
 redis:
   host: <enter redis host>
-  port: <enter redis host>
+  port: <enter redis port>
   password: <enter redis access key>
 topic:
   name: <topic name e.g. myserver.products>

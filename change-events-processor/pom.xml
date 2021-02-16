@@ -8,9 +8,9 @@
 		<relativePath />
 	</parent>
 	<groupId>com.demo.azure</groupId>
-	<artifactId>change-event-consumer</artifactId>
+	<artifactId>change-events-processor</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>change-event-consumer</name>
+	<name>change-events-processor</name>
 	<properties>
 		<java.version>11</java.version>
 	</properties>
