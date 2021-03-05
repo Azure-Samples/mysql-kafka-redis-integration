@@ -13,21 +13,21 @@ This example demonstrates a data pipeline, to synchronize data between MySQL and
 - The high level solution architecture
 - The end to end guide/how-to on how to deploy and test the entire solution on Azure
 
-Imagine data being uploaded (using a batched mode for example) to a relational database ([MySQL on Azure](https://docs.microsoft.com/azure/mysql/overview?WT.mc_id=data-14444-abhishgu) in this case) - this can be continuously synchronized to a search engine (using [RediSearch module on Azure](https://docs.microsoft.com/azure/azure-cache-for-redis/?WT.mc_id=data-14444-abhishgu) in this case) with low latency. This provides a foundation for other services (such as APIs) to drive important parts of the business, such as a customer facing website that can provide fresh, up-to date information on products, availability etc.
+Imagine data being uploaded (using a batched mode for example) to a relational database ([MySQL on Azure](https://docs.microsoft.com/azure/mysql/overview?WT.mc_id=data-14444-abhishgu) in this case) - this can be continuously synchronized to a search engine with low latency - In this solution, [Redis on Azure](https://docs.microsoft.com/azure/azure-cache-for-redis/?WT.mc_id=data-14444-abhishgu) is used as the search engine (more on this soon). This provides a foundation for other services (such as APIs) to drive important parts of the business, such as a customer facing website that can provide fresh, up-to date information on products, availability etc.
 
 ## Solution architecture
 
 This section provides a high level overview of the solution and the individual components.
 
-TODO diagram
+![](arch-diag.png)
 
 As you can see, it has several moving parts:
 
 - The infrastructure components that form the bedrock of the architecture
-    - MySQL database: Fully managed database as a service
     - Apache Kafka: [Confluent Cloud Kafka cluster on Azure infrastructure](https://azure.microsoft.com/en-us/blog/introducing-seamless-integration-between-microsoft-azure-and-confluent-cloud/) (available via Azure Marketplace)
-    - Kafka Connect cluster with [MySQL source connector](https://docs.confluent.io/cloud/current/connectors/cc-mysql-source.html): Both are fully managed!
-    - redis: azure redis enterprise for redisearch
+    - Redis: To be specific, we will be using the [RediSearch module](https://oss.redislabs.com/redisearch) which is supported in the [Enterprise Tier of Azure Cache for Redis](https://docs.microsoft.com/azure/azure-cache-for-redis/quickstart-create-redis-enterprise?WT.mc_id=data-14444-abhishgu)
+    - MySQL database: Fully managed database as a service
+    - Kafka Connect cluster with [MySQL source connector](https://docs.confluent.io/cloud/current/connectors/cc-mysql-source.html) (fully managed!)
 - Application components: These are services running on [Azure Spring Cloud](https://docs.microsoft.com/azure/spring-cloud/spring-cloud-overview?WT.mc_id=data-14444-abhishgu)
     - Change Event Processor: A Java [Spring Boot](https://spring.io/projects/spring-boot) application that uses [Spring Kafka integration](https://spring.io/projects/spring-kafka).
     - Search application: Another Java Spring Boot app that exposes a REST API.
@@ -59,7 +59,7 @@ Before we dive into the nitty gritty, please ensure that you have:
 - **Azure Cache for Redis**: Use the Azure portal to [create a Redis Enterprise cache instance](https://docs.microsoft.com/azure/azure-cache-for-redis/quickstart-create-redis-enterprise?WT.mc_id=data-14444-abhishgu).
 - **Azure Spring Cloud**: [Provision an instance of Azure Spring Cloud](https://docs.microsoft.com/azure/spring-cloud/spring-cloud-quickstart?tabs=Azure-CLI&pivots=programming-language-java&WT.mc_id=data-14444-abhishgu#provision-an-instance-of-azure-spring-cloud) using the Azure portal.
 
-### You also need to configure ...
+### You also need to configure
 
 **MySQL instance on Azure**
 
@@ -125,7 +125,7 @@ spring:
 ...
 ```
 
-The config for the Search API service is much smaller:
+The config for the Search API service is quite compact:
 
 ```yaml
 redis:
@@ -134,7 +134,7 @@ redis:
   password: <enter redis access key>
 ```
 
-Build the JAR files:
+Build JAR files for the Spring applications:
 
 ```bash
 export JAVA_HOME=<enter path to JDK e.g. /Library/Java/JavaVirtualMachines/zulu-11.jdk/Contents/Home>
@@ -172,7 +172,21 @@ az spring-cloud app deploy -n change-events-processor -s <enter the name of Azur
 az spring-cloud app deploy -n search-api -s <enter the name of Azure Spring Cloud service instance> -g <enter azure resource group name> --jar-path search-api/target/search-api-0.0.1-SNAPSHOT.jar
 ```
 
-## Test the application
+## Time to see real time search in action!
+
+Now that we have all the components in place, we can test the end to end functionality. It's quite simple:
+
+- Add new product data to the MySQL database
+- Use the Search app to make sure it has propagated all the way to Redis
+
+Insert random product data:
+
+```sql
+INSERT INTO `products` VALUES (42, 'Outdoor chairs', NOW(), '{"brand": "Mainstays", "description": "Mainstays Solid Turquoise 72 x 21 in. Outdoor Chaise Lounge Cushion", "tags": ["Self ties cushion", "outdoor chairs"], "categories": ["Garden"]}');
+
+INSERT INTO `products` VALUES (43, 'aPhone', NOW(), '{"brand": "Orange", "description": "An inexpensive phone", "tags": ["electronics", "mobile phone"], "categories": ["Electronics"]}');
+
+```
 
 Get the URL for Search API service - use the portal or the [CLI as such](https://docs.microsoft.com/cli/azure/ext/spring-cloud/spring-cloud/app?view=azure-cli-latest&WT.mc_id=data-14444-abhishgu#ext_spring_cloud_az_spring_cloud_app_show):
 
@@ -180,26 +194,78 @@ Get the URL for Search API service - use the portal or the [CLI as such](https:/
 az spring-cloud app show -n search-api -s <enter the name of Azure Spring Cloud service instance> -g <enter azure resource group name>
 ```
 
-Use `curl` or another HTTP client to invoke the Search API. Here are a few examples to get you started:
+Use `curl` or another HTTP client to invoke the Search API. Each of these queries will return results in form of a JSON payload as such:
+
+```json
+[
+    {
+        "created": "1614235666000",
+        "name": "Outdoor chairs",
+        "description": "Mainstays Solid Turquoise 72 x 21 in. Outdoor Chaise Lounge Cushion",
+        "id": "42",
+        "categories": "Garden",
+        "brand": "Mainstays",
+        "tags": "Self ties cushion, outdoor chairs"
+    },
+    {
+        "created": "1614234718000",
+        "name": "aPhone",
+        "description": "An inexpensive phone",
+        "id": "43",
+        "categories": "Electronics",
+        "brand": "Orange",
+        "tags": "electronics, mobile phone"
+    }
+]
+```
+
+Here are a few examples to get you started. Note that the query parameter `q` is used to specify the [RediSearch query](https://oss.redislabs.com/redisearch/Query_Syntax/).
 
 ```bash
 # search for all records
 curl <search api URL>/search?q=*
 
 # search for products by name
-curl <search api URL>/search?q=@name:xbox*
+curl <search api URL>/search?q=@name:Outdoor chairs
 
 # search for products by category
-curl <search api URL>/search?q=@categories:{sports | kids}
+curl <search api URL>/search?q=@categories:{Garden | Electronics}
 
 # search for products by brand
-curl <search api URL>/search?q=@brand:nike
+curl <search api URL>/search?q=@brand:Mainstays
 
 # apply multiple search criteria
-curl <search api URL>/search?q=@categories:{electronics | gaming} @brand:microsoft
+curl <search api URL>/search?q=@categories:{Electronics} @brand:Orange
 ```
 
-> Take a look at the [RediSearch Query Syntax](https://oss.redislabs.com/redisearch/Query_Syntax/) and try other queries as well.
+> You can continue to add more product information and check the pipeline.
+
+Other things you might want to try:
+
+- Confirm that information is flowing to the [Kafka topic in Confluent Cloud](https://docs.confluent.io/cloud/current/connectors/cc-mysql-source.html#step-7-check-the-ak-topic)
+- [Check the logs for the consumer application](https://docs.microsoft.com/cli/azure/ext/spring-cloud/spring-cloud/app?view=azure-cli-latest&WT.mc_id=data-14444-abhishgu#ext_spring_cloud_az_spring_cloud_app_logs) deployed to Azure Spring Cloud - this will give a sneak peek into the records that are getting processed (use `az spring-cloud app logs -n <app name> -s <service name> -g <resource group>`)
+- Take a look at the [RediSearch Query Syntax](https://oss.redislabs.com/redisearch/Query_Syntax/) and try other queries as well.
+- Connect to the Azure Cache for Redis instance and run the RediSearch queries directly - just to double check.
+
+Connect using `redis-cli` as such:
+
+```bash
+redis-cli -h <enter host name> -p <enter port i.e. 10000> -a <enter redis password/access key> --tls
+```
+
+## Exporting data to Azure Data Lake
+
+If you want to store this data to Azure Data Lake Storage for longer term (cold), the [ADLS Gen2 connector](https://docs.confluent.io/cloud/current/connectors/cc-azure-datalakeGen2-storage-sink.html) for Kafka has you covered. For our scenario, we already have product data flowing into the Kafka topic in Confluent Cloud on Azure - all we need to do configure the connector to get the job done.
+
+> And guess what, that's available as a fully-managed offering as well!
+
+Here is what you need to do:
+
+- [Create a storage account](https://docs.microsoft.com/azure/storage/blobs/create-data-lake-storage-account?WT.mc_id=data-14444-abhishgu)
+- Configure the connector and start it. Please make sure to use the same topic name as you did before (e.g. `myserver.products`)
+- Confirm that the data was exported to the Azure storage container in the ADLS account.
+
+> For a step by step guide, please [follow the documentation](https://docs.confluent.io/cloud/current/connectors/cc-azure-datalakeGen2-storage-sink.html#quick-start)
 
 ## Clean up
 
@@ -207,6 +273,17 @@ Once you're done, make sure to delete the services to so that you do not incur u
 
 ## Conclusion
 
-You learnt about the high level architecture and the complete guide on how to run the solution on Azure. Please note that this is just a part of a potentially larger use case. Thanks to Kafka, you can extend this to integrate with other systems as well, for example, [Azure Data Lake](https://docs.microsoft.com/azure/storage/blobs/data-lake-storage-introduction?WT.mc_id=data-14444-abhishgu) using (yet another fully managed!) the [ADLS Gen2 connector](https://docs.confluent.io/cloud/current/connectors/cc-azure-datalakeGen2-storage-sink.html).
+You learnt about the high level architecture and the complete guide on how to run the solution on Azure. Also, the entire solution was based on managed PaaS services. This offers a significant benefit since you don't have to setup and maintain complex distributed systems such as a database, streaming platform and runtime infrastructure for your Spring Boot Java apps.
 
-Also, the entire solution was based on managed PaaS services. This offers a significant benefit since you don't have to setup and maintain complex distributed systems such as a database, streaming platform and runtime infrastructure for your Spring Boot Java apps.
+Please note that this is just a part of a potentially larger use case. Thanks to Kafka, you can extend this to integrate with other systems as well, for example, [Azure Data Lake](https://docs.microsoft.com/azure/storage/blobs/data-lake-storage-introduction?WT.mc_id=data-14444-abhishgu) using (yet another fully managed!) the [ADLS Gen2 connector](https://docs.confluent.io/cloud/current/connectors/cc-azure-datalakeGen2-storage-sink.html).
+
+### Want to learn more?
+
+The following resources might be helpful:
+
+- [How to configure clustering in Azure Cache for Redis](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-premium-clustering)
+- [How to configure active geo-replication](https://docs.microsoft.com/azure/azure-cache-for-redis/cache-how-to-active-geo-replication?WT.mc_id=data-14444-abhishgu) in Enterprise Azure Cache for Redis instances
+- [Azure Spring Cloud reference architecture](https://docs.microsoft.com/azure/spring-cloud/spring-cloud-reference-architecture?WT.mc_id=data-14444-abhishgu)
+- [Setup Service Discovery for your Spring Cloud microservices](https://docs.microsoft.com/azure/spring-cloud/spring-cloud-service-registration?pivots=programming-language-java&WT.mc_id=data-14444-abhishgu)
+- [Choose the right MySQL Server option in Azure](https://docs.microsoft.com/azure/mysql/select-right-deployment-type?WT.mc_id=data-14444-abhishgu)
+- [Migrate your MySQL database by using import and export](https://docs.microsoft.com/azure/mysql/concepts-migrate-import-export?WT.mc_id=data-14444-abhishgu)
