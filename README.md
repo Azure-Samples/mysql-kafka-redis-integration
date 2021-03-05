@@ -281,6 +281,7 @@ Please note that this is just a part of a potentially larger use case. Thanks to
 
 The following resources might be helpful:
 
+- [Get started with Apache Kafka for Confluent Cloud] (https://docs.microsoft.com/en-us/azure/partner-solutions/apache-kafka-confluent-cloud/create)
 - [How to configure clustering in Azure Cache for Redis](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-premium-clustering)
 - [How to configure active geo-replication](https://docs.microsoft.com/azure/azure-cache-for-redis/cache-how-to-active-geo-replication?WT.mc_id=data-14444-abhishgu) in Enterprise Azure Cache for Redis instances
 - [Azure Spring Cloud reference architecture](https://docs.microsoft.com/azure/spring-cloud/spring-cloud-reference-architecture?WT.mc_id=data-14444-abhishgu)
